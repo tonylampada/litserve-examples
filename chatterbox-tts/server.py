@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class TTSRequest(BaseModel):
     text: str = Field(
-        ..., min_length=1, max_length=500, description="Input text to synthesize"
+        ..., min_length=1, description="Input text to synthesize"
     )
     audio_prompt: Optional[str] = Field(
         None, description="Base64 audio, URL, or file path"
@@ -96,6 +96,8 @@ class ChatterboxTTSAPI(LitAPI):
 
     def predict(self, inputs: Tuple) -> bytes:
         """Generate speech audio using Chatterbox TTS."""
+        import torch
+
         text, audio_prompt_path, exaggeration, cfg, temperature = inputs
 
         try:
@@ -111,6 +113,11 @@ class ChatterboxTTSAPI(LitAPI):
             ta.save(buffer, wav, self.model.sr, format="wav")
             audio_bytes = buffer.getvalue()
             return audio_bytes
+        except Exception as e:
+            # Clear CUDA cache on error to prevent state corruption
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            raise
         finally:
             # Clean up temp files
             self._cleanup_temp_files()
